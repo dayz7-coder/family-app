@@ -22,8 +22,8 @@ app.use((req, res, next) => {
 // ============================================================
 
 // Проверка: сервер жив
-app.use(express.static('public'));
-
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Все пользователи ---
 app.get('/api/users', async (req, res) => {
