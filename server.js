@@ -158,7 +158,7 @@ app.use((req, res) => {
 // ============================================================
 (async () => {
   await db.initDatabase();
-  app.listen(PORT,'0.0.0.0' () => {
+  app.listen(PORT,'0.0.0.0', () => {
     console.log(`\n🚀 Сервер запущен: http://localhost:${PORT}`);
     console.log(`📋 Проверка:      http://localhost:${PORT}/`);
     console.log(`👨 Родители:      http://localhost:${PORT}/api/parents`);
