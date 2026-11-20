@@ -9,6 +9,18 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+const path = require('path');
+
+// Раздаем папку public
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ГЛАВНЫЙ ФИКС: при заходе на главную страницу открываем login.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// ... дальше идут твои API маршруты (app.get('/api/users') и т.д.)
+});
 app.use(express.static('public'));   // ← добавить эту строку
 
 // Логирование запросов
@@ -22,8 +34,7 @@ app.use((req, res, next) => {
 // ============================================================
 
 // Проверка: сервер жив
-const path = require('path');
-app.use(express.static(path.join(__dirname, 'public')));
+
 
 // --- Все пользователи ---
 app.get('/api/users', async (req, res) => {
