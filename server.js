@@ -23,23 +23,7 @@ app.use((req, res, next) => {
 
 // Проверка: сервер жив
 app.use(express.static('public'));
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Сервер "Родители и Дети" работает',
-    endpoints: [
-      'GET    /api/users',
-      'GET    /api/users/:id',
-      'POST   /api/users',
-      'DELETE /api/users/:id',
-      'GET    /api/users/:id/children',
-      'GET    /api/users/:id/parents',
-      'POST   /api/parent-child',
-      'GET    /api/parents',
-      'GET    /api/children',
-    ],
-  });
-});
+
 
 // --- Все пользователи ---
 app.get('/api/users', async (req, res) => {
