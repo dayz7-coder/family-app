@@ -20,7 +20,6 @@ app.get('/', (req, res) => {
 });
 
 // ... дальше идут твои API маршруты (app.get('/api/users') и т.д.)
-});
 app.use(express.static('public'));   // ← добавить эту строку
 
 // Логирование запросов
