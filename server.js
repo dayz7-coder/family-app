@@ -22,6 +22,7 @@ app.use((req, res, next) => {
 // ============================================================
 
 // Проверка: сервер жив
+app.use(express.static('public'));
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
