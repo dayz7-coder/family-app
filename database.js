@@ -1,131 +1,76 @@
-// database.js — работа с БД
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'family.sqlite');
+const DB_PATH = path.join(__dirname, 'data', 'family.sqlite');
 const db = new sqlite3.Database(DB_PATH);
 
-const run = (sql, params = []) =>
-  new Promise((resolve, reject) =>
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    })
-  );
-
-const get = (sql, params = []) =>
-  new Promise((resolve, reject) =>
-    db.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)))
-  );
-
-const all = (sql, params = []) =>
-  new Promise((resolve, reject) =>
-    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)))
-  );
+const run = (sql, params = []) => new Promise((res, rej) => db.run(sql, params, function(err) { err ? rej(err) : res(this); }));
+const get = (sql, params = []) => new Promise((res, rej) => db.get(sql, params, (err, row) => err ? rej(err) : res(row)));
+const all = (sql, params = []) => new Promise((res, rej) => db.all(sql, params, (err, rows) => err ? rej(err) : res(rows)));
 
 async function initDatabase() {
   await run('PRAGMA foreign_keys = ON');
 
+  // Таблица семей
+  await run(`
+    CREATE TABLE IF NOT EXISTS families (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Таблица пользователей (с паролями)
   await run(`
     CREATE TABLE IF NOT EXISTS users (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      email         TEXT UNIQUE NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      family_id INTEGER NOT NULL,
+      email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      full_name     TEXT NOT NULL,
-      role          TEXT NOT NULL CHECK (role IN ('PARENT','CHILD')),
-      birth_date    TEXT,
-      created_at    TEXT DEFAULT CURRENT_TIMESTAMP
+      full_name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('PARENT','CHILD')),
+      birth_date TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE
     )
   `);
 
+  // Связи родитель-ребенок
   await run(`
     CREATE TABLE IF NOT EXISTS parent_child (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       parent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      child_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE (parent_id, child_id),
-      CHECK (parent_id <> child_id)
+      child_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE (parent_id, child_id)
     )
   `);
-
-  await run(`CREATE INDEX IF NOT EXISTS idx_pc_parent ON parent_child(parent_id)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_pc_child  ON parent_child(child_id)`);
+  
+  console.log('✅ База данных готова');
 }
 
-// ===== Операции =====
-async function addUser({ email, passwordHash, fullName, role, birthDate = null }) {
-  if (!['PARENT', 'CHILD'].includes(role)) {
-    throw new Error('role должен быть PARENT или CHILD');
-  }
+// Создать семью
+async function createFamily(name) {
+  const res = await run(`INSERT INTO families (name) VALUES (?)`, [name]);
+  return get(`SELECT * FROM families WHERE id = ?`, [res.lastID]);
+}
+
+// Добавить пользователя
+async function addUser({ familyId, email, passwordHash, fullName, role, birthDate = null }) {
   const res = await run(
-    `INSERT INTO users (email, password_hash, full_name, role, birth_date)
-     VALUES (?, ?, ?, ?, ?)`,
-    [email, passwordHash, fullName, role, birthDate]
+    `INSERT INTO users (family_id, email, password_hash, full_name, role, birth_date) VALUES (?, ?, ?, ?, ?, ?)`,
+    [familyId, email, passwordHash, fullName, role, birthDate]
   );
-  return get('SELECT id, email, full_name, role, birth_date, created_at FROM users WHERE id = ?', [res.lastID]);
+  return get('SELECT id, family_id, email, full_name, role, birth_date FROM users WHERE id = ?', [res.lastID]);
 }
 
-async function linkParentChild(parentId, childId) {
-  const parent = await get('SELECT role FROM users WHERE id = ?', [parentId]);
-  const child  = await get('SELECT role FROM users WHERE id = ?', [childId]);
-
-  if (!parent || !child) throw new Error('Пользователь не найден');
-  if (parent.role !== 'PARENT') throw new Error('parentId должен иметь role=PARENT');
-  if (child.role !== 'CHILD')   throw new Error('childId должен иметь role=CHILD');
-
-  await run(
-    `INSERT OR IGNORE INTO parent_child (parent_id, child_id) VALUES (?, ?)`,
-    [parentId, childId]
-  );
-}
-
-function getChildren(parentId) {
-  return all(
-    `SELECT u.id, u.full_name, u.birth_date
-     FROM parent_child pc
-     JOIN users u ON u.id = pc.child_id
-     WHERE pc.parent_id = ?
-     ORDER BY u.id`,
-    [parentId]
-  );
-}
-
-function getParents(childId) {
-  return all(
-    `SELECT u.id, u.full_name
-     FROM parent_child pc
-     JOIN users u ON u.id = pc.parent_id
-     WHERE pc.child_id = ?
-     ORDER BY u.id`,
-    [childId]
-  );
-}
-
-function getAllUsers() {
-  return all('SELECT id, email, full_name, role, birth_date, created_at FROM users ORDER BY id');
-}
-
-function getUserById(id) {
-  return get('SELECT id, email, full_name, role, birth_date, created_at FROM users WHERE id = ?', [id]);
-}
-
-function getUserByEmail(email) {
+// Найти по email (для входа)
+async function getUserByEmail(email) {
   return get('SELECT * FROM users WHERE email = ?', [email]);
 }
 
-async function deleteUser(id) {
-  await run('DELETE FROM users WHERE id = ?', [id]);
+// Получить всех пользователей ТОЛЬКО ОДНОЙ семьи
+async function getUsersByFamily(familyId) {
+  return all(`SELECT id, full_name, role, birth_date FROM users WHERE family_id = ?`, [familyId]);
 }
 
-module.exports = {
-  db,
-  initDatabase,
-  addUser,
-  linkParentChild,
-  getChildren,
-  getParents,
-  getAllUsers,
-  getUserById,
-  getUserByEmail,
-  deleteUser,
-};
+module.exports = { db, initDatabase, createFamily, addUser, getUserByEmail, getUsersByFamily };

@@ -1,147 +1,60 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход в систему</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: linear-gradient(135deg, #0d6efd, #0a58ca); min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
-        .login-card { background: white; padding: 35px 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 100%; max-width: 480px; }
-        .login-card h2 { text-align: center; color: #0d6efd; font-weight: 700; margin-bottom: 5px; }
-        .login-card p.subtitle { text-align: center; color: #6c757d; margin-bottom: 25px; font-size: 0.95rem; }
-        .accounts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px; }
-        .account-btn { background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 12px; padding: 12px 5px; text-align: center; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; }
-        .account-btn:hover { border-color: #0d6efd; background: #e7f1ff; transform: translateY(-2px); }
-        .account-btn.active { border-color: #0d6efd; background: #e7f1ff; box-shadow: 0 4px 10px rgba(13,110,253,0.2); }
-        .account-btn .avatar { font-size: 1.8rem; display: block; margin-bottom: 4px; }
-        .account-btn .role { font-weight: 600; color: #495057; }
-        .login-card .form-control { padding: 12px 15px; border-radius: 10px; border: 1px solid #ced4da; font-size: 1rem; }
-        .login-card .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.25); }
-        .login-card .btn-primary { padding: 12px; border-radius: 10px; font-weight: 600; font-size: 1rem; background: #0d6efd; border: none; }
-        .login-card .btn-primary:hover { background: #0a58ca; }
-        .login-card .link-text { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #6c757d; }
-        .login-card .link-text a { color: #0d6efd; text-decoration: none; font-weight: 500; cursor: pointer; }
-        .login-card .link-text a:hover { text-decoration: underline; }
-        .error-message { color: #dc3545; font-size: 0.9rem; text-align: center; margin-top: 10px; display: none; }
-        .password-group { position: relative; margin-bottom: 15px; }
-        .password-group .form-control { padding-right: 45px; margin-bottom: 0; }
-        .eye-toggle { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.2rem; color: #6c757d; user-select: none; }
-        .eye-toggle:hover { color: #0d6efd; }
-        .email-group { margin-bottom: 15px; }
-        .hint-text { text-align: center; font-size: 0.8rem; color: #adb5bd; margin-top: 15px; }
-        @media (max-width: 400px) { .accounts-grid { grid-template-columns: repeat(2, 1fr); } }
-    </style>
+  <meta charset="UTF-8">
+  <title>Вход</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f6fb; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    button { background: #667eea; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #5568d3; }
+    .err { color: red; font-size: 14px; }
+  </style>
 </head>
 <body>
-    <div class="login-card">
-        <h2>📅  Расписание</h2>
-        <p class="subtitle">Выберите аккаунт и войдите в систему</p>
+  <div class="card">
+    <h2>Вход в семью</h2>
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Пароль" required>
+    <button onclick="login()">Войти</button>
+    <p id="msg" class="err"></p>
+    <p style="text-align:center; font-size: 14px;">
+      Нет аккаунта? <a href="/register">Зарегистрироваться</a>
+    </p>
+  </div>
 
-        <div class="accounts-grid">
-            <div class="account-btn active" data-email="mama@family.ru" onclick="selectAccount(this)">
-                <span class="avatar">👩 </span><span class="role">Мама</span>
-            </div>
-            <div class="account-btn" data-email="papa@family.ru" onclick="selectAccount(this)">
-                <span class="avatar">👨 </span><span class="role">Папа</span>
-            </div>
-            <div class="account-btn" data-email="son@family.ru" onclick="selectAccount(this)">
-                <span class="avatar">👦 </span><span class="role">Сын</span>
-            </div>
-            <div class="account-btn" data-email="daughter@family.ru" onclick="selectAccount(this)">
-                <span class="avatar">👧 </span><span class="role">Дочь</span>
-            </div>
-        </div>
-22:54
-<form onsubmit="handleLogin(event)">
-            <div class="email-group">
-                <input type="email" class="form-control" id="loginEmail" placeholder="Электронная почта" required value="mama@family.ru">
-            </div>
-            <div class="password-group">
-                <input type="password" class="form-control" id="loginPassword" placeholder="Пароль" required value="12345">
-                <span class="eye-toggle" id="eyeToggle" onclick="togglePassword()">👁</span>
-            </div>
-            <div class="error-message" id="errorMessage">Введите корректные данные</div>
-            <button type="submit" class="btn btn-primary w-100 mt-3">Войти</button>
-        </form>
+  <script>
+    const API_KEY = 'family_secret_2024';
 
-        <div class="link-text">Нет аккаунта? <a onclick="goToRegister()">Зарегистрироваться</a></div>
-        <div class="hint-text">💡  Демо-пароль для всех: <strong>12345</strong></div>
-    </div>
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const msg = document.getElementById('msg');
+      msg.textContent = '';
 
-    <script>
-        function selectAccount(element) {
-            document.querySelectorAll('.account-btn').forEach(btn => btn.classList.remove('active'));
-            element.classList.add('active');
-            document.getElementById('loginEmail').value = element.getAttribute('data-email');
-            document.getElementById('loginPassword').focus();
-        }
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY 
+          },
+          body: JSON.stringify({ email, password })
+        });
 
-        function togglePassword() {
-            let p = document.getElementById('loginPassword');
-            let e = document.getElementById('eyeToggle');
-            if (p.type === 'password') { p.type = 'text'; e.textContent = '🙈 '; }
-            else { p.type = 'password'; e.textContent = '👁'; }
-        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Ошибка входа');
 
-        function handleLogin(event) {
-            event.preventDefault();
-            let email = document.getElementById('loginEmail').value.trim();
-            let password = document.getElementById('loginPassword').value.trim();
-
-            let emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
-            if (!emailPattern.test(email)) { showError("Введите корректный email"); return; }
-
-            // Ищем зарегистрированных пользователей в sessionStorage
-            let registeredUsers = JSON.parse(sessionStorage.getItem('registeredUsers')) || [];
-            let foundUser = registeredUsers.find(u => u.email === email);
-
-            if (foundUser) {
-                if (foundUser.password !== password) { showError("Неверный пароль"); return; }
-                sessionStorage.setItem('isLoggedIn', 'true');
-                sessionStorage.setItem('userEmail', email);
-                sessionStorage.setItem('userName', foundUser.name);
-                sessionStorage.setItem('userRole', foundUser.role);
-
-                if (foundUser.role === 'parent') {
-                    window.location.href = 'parent.html';
-                } else {
-                    alert('Вы вошли как ребенок. Страница для ребенка пока в разработке.');
-                }
-                return;
-            }
-
-            // Демо-аккаунты
-            if (password !== '12345') { showError("Неверный пароль. Подсказка: 12345"); return; }
-
-            let userName = "Пользователь";
-            let userRole = "parent";
-            if (email === 'mama@family.ru') { userName = "Мама"; userRole = "parent"; }
-            else if (email === 'papa@family.ru') { userName = "Папа"; userRole = "parent"; }
-            else if (email === 'son@family.ru') { userName = "Сын"; userRole = "child"; }
-            else if (email === 'daughter@family.ru') { userName = "Дочь"; userRole = "child"; }
-            else { userName = email.split('@')[0]; userRole = "parent"; }
-
-            sessionStorage.setItem('isLoggedIn', 'true');
-            sessionStorage.setItem('userEmail', email);
-            sessionStorage.setItem('userName', userName);
-            sessionStorage.setItem('userRole', userRole);
-
-            if (userRole === 'parent') {
-                window.location.href = 'parent.html';
-            } else {
-                alert('Вы вошли как ребенок. Страница для ребенка пока в разработке.');
-            }
-}
-
-        function goToRegister() { window.location.href = 'register.html'; }
-
-        function showError(message) {
-            let el = document.getElementById('errorMessage');
-            el.textContent = message;
-            el.style.display = 'block';
-            setTimeout(() => { el.style.display = 'none'; }, 3000);
-        }
-    </script>
+        // Сохраняем токен (если сервер его выдает)
+        if(data.token) localStorage.setItem('token', data.token);
+        
+        // Перекидываем на страницу родителя
+        window.location.href = '/parent';
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    }
+  </script>
 </body>
 </html>

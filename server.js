@@ -1,162 +1,102 @@
-// server.js — REST API для приложения "Родители и Дети"
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SECRET_KEY = process.env.SECRET_KEY;// Секретный ключ сервера
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-const path = require('path');
+app.use(express.static('public'));
 
-// Раздаем папку public
-app.use(express.static(path.join(__dirname, 'public')));
+// ==========================================
+// ПРОВЕРКА ТОКЕНА (Охранник)
+// ==========================================
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
 
-// ГЛАВНЫЙ ФИКС: при заходе на главную страницу открываем login.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
+  if (!token) return res.status(401).json({ error: 'Нет доступа. Войдите в систему.' });
 
-// ... дальше идут твои API маршруты (app.get('/api/users') и т.д.)
-app.use(express.static('public'));   // ← добавить эту строку
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Неверный или просроченный токен.' });
+    req.user = user; // Теперь сервер знает, кто пришел и из какой он семьи
+    next();
+  });
+}
 
-// Логирование запросов
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()}  ${req.method} ${req.url}`);
-  next();
-});
-
-// ============================================================
-// ROUTES
-// ============================================================
-
-// Проверка: сервер жив
-
-
-// --- Все пользователи ---
-app.get('/api/users', async (req, res) => {
+// ==========================================
+// РЕГИСТРАЦИЯ
+// ==========================================
+app.post('/api/register', async (req, res) => {
   try {
-    const { role } = req.query;
-    let users = await db.getAllUsers();
-    if (role) users = users.filter((u) => u.role === role.toUpperCase());
+    const { familyName, email, password, fullName } = req.body;
+    const existing = await db.getUserByEmail(email);
+    if (existing) return res.status(400).json({ error: 'Email уже занят' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const family = await db.createFamily(familyName);
+    const user = await db.addUser({ familyId: family.id, email, passwordHash, fullName, role: 'PARENT' });
+
+    res.status(201).json({ message: 'Семья создана', userId: user.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ==========================================
+// ВХОД (Выдает токен)
+// ==========================================
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await db.getUserByEmail(email);
+    if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) return res.status(401).json({ error: 'Неверный email или пароль' });
+
+    // Создаем токен (пропуск)
+    const token = jwt.sign(
+      { id: user.id, family_id: user.family_id, role: user.role }, 
+      SECRET_KEY, 
+      { expiresIn: '7d' }
+    );
+    
+    res.json({ token, user: { fullName: user.full_name, role: user.role } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ==========================================
+// ЗАЩИЩЕННЫЕ ДАННЫЕ
+// ==========================================
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    // Сервер БЕРЕТ family_id ИЗ ТОКЕНА, а не из ссылки!
+    const users = await db.getUsersByFamily(req.user.family_id);
     res.json(users);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// --- Все родители ---
-app.get('/api/parents', async (req, res) => {
-  try {
-    const users = await db.getAllUsers();
-    res.json(users.filter((u) => u.role === 'PARENT'));
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// ==========================================
+// СТРАНИЦЫ
+// ==========================================
+app.get('/', (req, res) => res.sendFile(__dirname + '/public/login.html'));
+app.get('/login', (req, res) => res.sendFile(__dirname + '/public/login.html'));
+app.get('/register', (req, res) => res.sendFile(__dirname + '/public/register.html'));
+app.get('/parent', (req, res) => res.sendFile(__dirname + '/public/parent.html'));
 
-// --- Все дети ---
-app.get('/api/children', async (req, res) => {
-  try {
-    const users = await db.getAllUsers();
-    res.json(users.filter((u) => u.role === 'CHILD'));
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- Один пользователь ---
-app.get('/api/users/:id', async (req, res) => {
-  try {
-    const user = await db.getUserById(+req.params.id);
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    res.json(user);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- Регистрация ---
-app.post('/api/users', async (req, res) => {
-  try {
-    const { email, password, fullName, role, birthDate } = req.body;
-
-    if (!email || !password || !fullName || !role) {
-      return res.status(400).json({ error: 'Нужны email, password, fullName, role' });
-    }
-
-    // Простейшее "хеширование" (пока без bcrypt)
-    const passwordHash = `hash_${password}`;
-
-    const user = await db.addUser({ email, passwordHash, fullName, role, birthDate });
-    res.status(201).json(user);
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-// --- Удалить ---
-app.delete('/api/users/:id', async (req, res) => {
-  try {
-    const user = await db.getUserById(+req.params.id);
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    await db.deleteUser(+req.params.id);
-    res.json({ ok: true, deleted: user });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- Дети родителя ---
-app.get('/api/users/:id/children', async (req, res) => {
-  try {
-    const children = await db.getChildren(+req.params.id);
-    res.json(children);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- Родители ребёнка ---
-app.get('/api/users/:id/parents', async (req, res) => {
-  try {
-    const parents = await db.getParents(+req.params.id);
-    res.json(parents);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- Привязать ребёнка к родителю ---
-app.post('/api/parent-child', async (req, res) => {
-  try {
-    const { parentId, childId } = req.body;
-    if (!parentId || !childId) {
-      return res.status(400).json({ error: 'Нужны parentId и childId' });
-    }
-    await db.linkParentChild(+parentId, +childId);
-    res.json({ ok: true, parentId, childId });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-// 404
-app.use((req, res) => {
-  res.status(404).json({ error: `Маршрут ${req.method} ${req.url} не найден` });
-});
-
-// ============================================================
-// СТАРТ
-// ============================================================
 (async () => {
   await db.initDatabase();
-  app.listen(PORT,'0.0.0.0', () => {
-    console.log(`\n🚀 Сервер запущен: http://localhost:${PORT}`);
-    console.log(`📋 Проверка:      http://localhost:${PORT}/`);
-    console.log(`👨 Родители:      http://localhost:${PORT}/api/parents`);
-    console.log(`🧒 Дети:          http://localhost:${PORT}/api/children\n`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Сервер: http://localhost:${PORT}`);
   });
 })();
